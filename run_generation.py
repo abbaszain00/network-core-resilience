@@ -1,4 +1,4 @@
-from src import generation, metrics, visualise, mrkc, attacks
+from src import generation, metrics, visualise, mrkc, attacks, fastcm
 import networkx as nx
 
 # === 1. Generate the graph ===
@@ -18,4 +18,17 @@ print("Nodes:", G_mrkc.number_of_nodes(), "Edges:", G_mrkc.number_of_edges())
 print("Edges added by MRKC:", added_edges)
 print("Avg Core Number After MRKC:", metrics.average_core_number(G_mrkc))
 
+# === 3. Apply FastCM+ Reinforcement ===
+G_fastcm, fastcm_edges = fastcm.fastcm_reinforce(G, budget=5)
+visualise.draw_graph(G_fastcm, title="After FastCM+ Reinforcement")
+
+print("\nAfter FastCM+ Reinforcement:")
+print("Nodes:", G_fastcm.number_of_nodes(), "Edges:", G_fastcm.number_of_edges())
+print("Edges added by FastCM+:", fastcm_edges)
+print("Avg Core Number After FastCM+:", metrics.average_core_number(G_fastcm))
+
+
+print("\nΔ Core (MRKC vs FastCM+):")
+print("MRKC:", metrics.average_core_number(G_mrkc))
+print("FastCM+:", metrics.average_core_number(G_fastcm))
 
