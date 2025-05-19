@@ -1,19 +1,21 @@
-from src import generation, attacks, metrics
+from src import generation, metrics, visualise, mrkc, attacks
+import networkx as nx
 
-# Generate original graph
-G = generation.generate_random_graph(n=15, p=0.2, seed=42)
+# === 1. Generate the graph ===
+G = generation.get_test_graph(type="scale_free", n=30)
+visualise.draw_graph(G, title="Original Graph")
+
 print("Original:")
 print("Nodes:", G.number_of_nodes(), "Edges:", G.number_of_edges())
 print("Avg Core Number:", metrics.average_core_number(G))
 
-# Degree-based attack
-G_deg = attacks.degree_based_attack(G, num_nodes=2)
-print("\nAfter Degree-Based Attack:")
-print("Nodes:", G_deg.number_of_nodes(), "Edges:", G_deg.number_of_edges())
-print("Avg Core Number:", metrics.average_core_number(G_deg))
+# === 2. Apply MRKC Reinforcement ===
+G_mrkc, added_edges = mrkc.mrkc_reinforce(G, budget=5)
+visualise.draw_graph(G_mrkc, title="After MRKC Reinforcement")
 
-# K-core-based attack
-G_core = attacks.kcore_based_attack(G, num_nodes=2)
-print("\nAfter K-Core-Based Attack:")
-print("Nodes:", G_core.number_of_nodes(), "Edges:", G_core.number_of_edges())
-print("Avg Core Number:", metrics.average_core_number(G_core))
+print("\nAfter MRKC Reinforcement:")
+print("Nodes:", G_mrkc.number_of_nodes(), "Edges:", G_mrkc.number_of_edges())
+print("Edges added by MRKC:", added_edges)
+print("Avg Core Number After MRKC:", metrics.average_core_number(G_mrkc))
+
+

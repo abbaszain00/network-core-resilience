@@ -1,13 +1,22 @@
 import networkx as nx
 
-def generate_random_graph(n=10, p=0.3, seed=None):
-    """Generate an Erdős-Rényi random graph."""
-    return nx.erdos_renyi_graph(n=n, p=p, seed=seed)
+def get_test_graph(type="scale_free", n=30, seed=42):
+    """
+    Returns a synthetic test graph of the given type.
 
-def generate_scale_free_graph(n=10, m=2):
-    """Generate a Barabási–Albert scale-free graph."""
-    return nx.barabasi_albert_graph(n=n, m=m)
+    Parameters:
+        type (str): One of "random", "scale_free", or "small_world"
+        n (int): Number of nodes
+        seed (int): Random seed for reproducibility
 
-def generate_small_world_graph(n=10, k=4, p=0.1, seed=None):
-    """Generate a Watts-Strogatz small-world graph."""
-    return nx.watts_strogatz_graph(n=n, k=k, p=p, seed=seed)
+    Returns:
+        networkx.Graph: Generated graph
+    """
+    if type == "random":
+        return nx.erdos_renyi_graph(n=n, p=0.2, seed=seed)
+    elif type == "small_world":
+        return nx.watts_strogatz_graph(n=n, k=4, p=0.1, seed=seed)
+    elif type == "scale_free":
+        return nx.barabasi_albert_graph(n=n, m=2, seed=seed)
+    else:
+        raise ValueError(f"Unknown graph type: {type}")

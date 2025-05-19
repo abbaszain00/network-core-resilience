@@ -14,6 +14,8 @@ def degree_based_attack(G, num_nodes=1):
     to_remove = [node for node, _ in nodes_sorted[:num_nodes]]
     
     G_copy.remove_nodes_from(to_remove)
+    print("Degree-based nodes removed:", to_remove)
+
     return G_copy
 
 def kcore_based_attack(G, num_nodes=1):
@@ -36,4 +38,6 @@ def kcore_based_attack(G, num_nodes=1):
     to_remove = [node for node, _ in core_items[:num_nodes]]
     
     G_copy.remove_nodes_from(to_remove)
+    print("K-core-based nodes removed:", to_remove)
+
     return G_copy
