@@ -1,4 +1,5 @@
 import networkx as nx
+import json
 from src import generation, mrkc, fastcm, attacks, metrics
 
 results = []
@@ -47,3 +48,7 @@ for seed in range(5):  # You can increase this later
 print("\n==== Summary ====")
 for r in results:
     print(r)
+
+with open("mrkc_fastcm_results.json", "w") as f:
+    json.dump(results, f, indent=2)
+
