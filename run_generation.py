@@ -44,7 +44,6 @@ print("Max Core FastCM+:", metrics.max_core_number(G_fastcm))
 # Original graph
 G_attacked = attacks.degree_based_attack(G, num_nodes=3)
 visualise.draw_graph(G_attacked, title="Original Graph → After Attack")
-
 print("\nAfter Attack on Original Graph:")
 print("Avg Core Number:", metrics.average_core_number(G_attacked))
 print("Max Core Number:", metrics.max_core_number(G_attacked))
@@ -74,5 +73,40 @@ print("Max Core Number:", metrics.max_core_number(G_fastcm_attacked))
 print("Core Distribution:", metrics.core_distribution(G_fastcm_attacked))
 count, percent = metrics.retained_top_kcore_members(G, G_fastcm_attacked)
 print(f"FastCM+: Retained in top-k-core after attack: {count} / 30 ({percent:.2%})")
+
+# === 5. Apply K-Core Attack ===
+
+# Original Graph
+G_kcore_attacked = attacks.kcore_based_attack(G, num_nodes=3)
+visualise.draw_graph(G_kcore_attacked, title="Original Graph → K-Core Attack")
+print("\n[K-CORE ATTACK] Original:")
+print("Avg Core:", metrics.average_core_number(G_kcore_attacked))
+print("Max Core:", metrics.max_core_number(G_kcore_attacked))
+print("Core Distribution:", metrics.core_distribution(G_kcore_attacked))
+count, percent = metrics.retained_top_kcore_members(G, G_kcore_attacked)
+print(f"Retained in top-k-core: {count} / 30 ({percent:.2%})")
+
+# MRKC-reinforced graph
+G_mrkc_kcore_attacked = attacks.kcore_based_attack(G_mrkc, num_nodes=3)
+visualise.draw_graph(G_mrkc_kcore_attacked, title="MRKC → K-Core Attack")
+print("\n[K-CORE ATTACK] MRKC:")
+print("Avg Core:", metrics.average_core_number(G_mrkc_kcore_attacked))
+print("Max Core:", metrics.max_core_number(G_mrkc_kcore_attacked))
+print("Core Distribution:", metrics.core_distribution(G_mrkc_kcore_attacked))
+count, percent = metrics.retained_top_kcore_members(G, G_mrkc_kcore_attacked)
+print(f"Retained in top-k-core: {count} / 30 ({percent:.2%})")
+
+
+# FastCM+-reinforced graph
+G_fastcm_kcore_attacked = attacks.kcore_based_attack(G_fastcm, num_nodes=3)
+visualise.draw_graph(G_fastcm_kcore_attacked, title="FastCM+ → K-Core Attack")
+print("\n[K-CORE ATTACK] FastCM+:")
+print("Avg Core:", metrics.average_core_number(G_fastcm_kcore_attacked))
+print("Max Core:", metrics.max_core_number(G_fastcm_kcore_attacked))
+print("Core Distribution:", metrics.core_distribution(G_fastcm_kcore_attacked))
+count, percent = metrics.retained_top_kcore_members(G, G_fastcm_kcore_attacked)
+print(f"Retained in top-k-core: {count} / 30 ({percent:.2%})")
+
+
 
 
