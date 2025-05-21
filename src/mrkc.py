@@ -60,62 +60,55 @@ def compute_core_influence(G, core_numbers=None):
 
     return core_influence
 
-
-
-
-def simulate_retention_score(G, edge, num_nodes_to_remove=3):
-    """
-    Simulates the effect of adding an edge and performing an attack,
-    returning the number of original top-k-core nodes retained in the top core.
-
-    Returns -1 if edge already exists.
-    """
-    u, v = edge
-    if G.has_edge(u, v):
-        return -1  # already connected
-
-    G_temp = G.copy()
-    G_temp.add_edge(u, v)
-
-    G_attacked = attacks.degree_based_attack(G_temp, num_nodes=num_nodes_to_remove)
-
-    retained_count, _ = metrics.retained_top_kcore_members(G, G_attacked)
-    return retained_count
-
-
 def mrkc_reinforce(G, budget=10):
     """
-    Reinforces the graph by adding `budget` edges between unconnected nodes
-    that have the most common neighbors (simple proxy for boosting resilience).
+    Implements the full MRKC edge selection strategy using
+    core strength and core influence for scoring as defined in the paper.
     
     Parameters:
-        G (networkx.Graph): The original graph
+        G (networkx.Graph): Original graph
         budget (int): Number of edges to add
-
+        
     Returns:
-        G_reinforced (networkx.Graph): Modified graph
-        added_edges (list of tuple): Edges that were added
+        G_reinforced (networkx.Graph): Graph after adding reinforcement edges
+        added_edges (list): List of edges that were added
     """
     G_reinforced = G.copy()
     added_edges = []
-
-    # Step 1: Get all unconnected node pairs
+    
+    # Calculate core numbers, core strength, and core influence
+    core = nx.core_number(G)
+    cs = {u: core_strength(G, u, core=core) for u in G.nodes()}
+    ci = compute_core_influence(G, core_numbers=core)
+    
+    # Get all possible edges to add
     potential_edges = [
         (u, v) for u, v in itertools.combinations(G.nodes(), 2)
         if not G.has_edge(u, v)
     ]
-
-    # Step 2: Score edges by resilience (simulated top-k-core retention)
+    
+    # Score edges using the paper's priority formula
     edge_scores = []
     for u, v in potential_edges:
-        score = simulate_retention_score(G, (u, v), num_nodes_to_remove=3)
-        edge_scores.append(((u, v), score))
-
-
-    # Step 3: Sort by score (descending) and add top edges
+        # Handle division by zero case
+        if cs[u] == 0 or cs[v] == 0:        
+            continue
+            
+        # Apply the appropriate scoring formula based on relative core numbers
+        if core[u] < core[v]:
+            priority = ci[u] / cs[u]
+        elif core[u] > core[v]:
+            priority = ci[v] / cs[v]
+        else:  # core[u] == core[v]
+            priority = (ci[u] / cs[u]) + (ci[v] / cs[v])
+            
+        edge_scores.append(((u, v), priority))
+    
+    # Select top edges
     edge_scores.sort(key=lambda x: x[1], reverse=True)
     for (u, v), _ in edge_scores[:budget]:
         G_reinforced.add_edge(u, v)
         added_edges.append((u, v))
-
+        
     return G_reinforced, added_edges
+
