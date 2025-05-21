@@ -2,7 +2,7 @@ from src import generation, metrics, visualise, mrkc, attacks, fastcm
 import networkx as nx
 
 # === 1. Generate the graph ===
-G = generation.get_test_graph(type="scale_free", n=30)
+G = generation.get_test_graph(type="scale_free", n=100)
 # visualise.draw_graph(G, title="Original Graph")
 
 print("Original:")
@@ -117,3 +117,10 @@ for node in sorted(G.nodes())[:5]:
     cs = core_strength(G, node)
     print(f"{node}\t{core_dict[node]}\t{cs}")
 
+from src.mrkc import compute_core_influence
+core = nx.core_number(G)
+ci = compute_core_influence(G, core)
+
+print("\nNode\tCore\tCore Influence")
+for node in sorted(ci)[:5]:
+    print(f"{node}\t{core[node]}\t{ci[node]:.3f}")

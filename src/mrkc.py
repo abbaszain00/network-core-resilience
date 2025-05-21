@@ -15,6 +15,51 @@ def core_strength(G, u, core=None):
     delta_ge = [v for v in neighbors if core.get(v, 0) >= ku]
     return len(delta_ge) - ku + 1
 
+def compute_core_influence(G, core_numbers=None):
+    """
+    Compute the Core Influence of all nodes as defined in the MRKC paper.
+
+    Parameters:
+        G (networkx.Graph): The graph
+        core_numbers (dict, optional): Pre-computed core numbers
+
+    Returns:
+        dict: Mapping of nodes to their core influence values
+    """
+    if core_numbers is None:
+        core_numbers = nx.core_number(G)
+    
+    # Initialize core influence values to 1.0 for all nodes
+    core_influence = {node: 1.0 for node in G.nodes()}
+    
+    # Identify V_delta: nodes with neighbors having higher core number
+    V_delta = set()
+    for u in G.nodes():
+        if any(core_numbers[v] > core_numbers[u] for v in G.neighbors(u)):
+            V_delta.add(u)
+    
+    # Process nodes in increasing order of core number
+    for k in range(1, max(core_numbers.values()) + 1):
+        nodes_with_core_k = [node for node, core in core_numbers.items() if core == k]
+        
+        for node in nodes_with_core_k:
+            if node in V_delta:
+                # Δ=(v): neighbors with equal core
+                neighbors_same_core = sum(1 for neighbor in G.neighbors(node) 
+                                          if core_numbers[neighbor] == k)
+                delta_factor = 1.0 - (neighbors_same_core / k) if k != 0 else 0.0
+
+                # Δ>(v): neighbors with higher core
+                higher_neighbors = [neighbor for neighbor in G.neighbors(node)
+                                    if core_numbers[neighbor] > k]
+                
+                if higher_neighbors:
+                    contribution = delta_factor * core_influence[node] / len(higher_neighbors)
+                    for neighbor in higher_neighbors:
+                        core_influence[neighbor] += contribution
+
+    return core_influence
+
 
 
 
