@@ -125,3 +125,93 @@ def apply_component_conversions(
                 raise RuntimeError(f"No valid target found for collapse node {last}")
 
     return G_reinforced, added_edges
+
+def fastcm_plus_reinforce(G: nx.Graph, k: int = None, budget: int = 10) -> Tuple[nx.Graph, List[Tuple[int, int]]]: # type: ignore
+    """
+    Main FastCM+ algorithm that orchestrates all components.
+    
+    Parameters:
+        G: Input graph
+        k: Target k-core to maximize (if None, uses max_core + 1)
+        budget: Number of edges that can be added
+        
+    Returns:
+        Tuple of (reinforced_graph, added_edges)
+    """
+    # Determine target k-core
+    if k is None:
+        current_cores = nx.core_number(G)
+        if not current_cores:
+            return G.copy(), []
+        max_core = max(current_cores.values())
+        k = max_core + 1  # Try to expand to next level
+    
+    # Check if (k-1)-shell exists
+    core_numbers = nx.core_number(G)
+    k_minus_1_shell = {node for node, core_val in core_numbers.items() if core_val == k - 1}
+    
+    if not k_minus_1_shell:
+        # No (k-1)-shell exists, cannot improve k-core
+        return G.copy(), []
+    
+    # Step 1: Get (k-1)-shell components with collapse nodes
+    try:
+        components_info = get_shell_components_with_collapse_nodes(G, k)
+    except Exception:
+        return G.copy(), []
+    
+    if not components_info:
+        return G.copy(), []
+    
+    # Step 2: Calculate conversion costs for each component
+    component_costs = []
+    for comp_nodes, collapse_nodes in components_info:
+        try:
+            cost = estimate_complete_conversion_cost(G, comp_nodes, collapse_nodes, k)
+            component_costs.append((comp_nodes, collapse_nodes, cost))
+        except RuntimeError:
+            # Skip components that can't be converted
+            continue
+    
+    if not component_costs:
+        return G.copy(), []
+    
+    # Step 3: Select best components using dynamic programming
+    try:
+        selected_components = select_components_dp_under_budget(component_costs, budget)
+    except Exception:
+        return G.copy(), []
+    
+    if not selected_components:
+        return G.copy(), []
+    
+    # Step 4: Apply conversions to selected components
+    try:
+        G_reinforced, added_edges = apply_component_conversions(G, selected_components, k)
+        return G_reinforced, added_edges
+    except Exception:
+        return G.copy(), []
+
+
+def fastcm_reinforce(G: nx.Graph, budget: int = 10) -> nx.Graph:
+    """
+    Simplified interface for FastCM+ that just returns the reinforced graph.
+    Matches the interface pattern of MRKC for easy comparison.
+    
+    Parameters:
+        G: Input graph
+        budget: Number of edges that can be added
+        
+    Returns:
+        Reinforced graph
+    """
+    G_reinforced, _ = fastcm_plus_reinforce(G, budget=budget)
+    return G_reinforced
+
+
+# For backwards compatibility and testing
+def fastcm_plus(G: nx.Graph, k: int, budget: int) -> Tuple[nx.Graph, List[Tuple[int, int]]]:
+    """
+    Alternative interface that requires explicit k parameter.
+    """
+    return fastcm_plus_reinforce(G, k=k, budget=budget)
