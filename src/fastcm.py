@@ -2,78 +2,56 @@ import networkx as nx
 from typing import List, Tuple, Set
 
 def get_shell_components_with_collapse_nodes(G: nx.Graph, k: int) -> List[Tuple[Set[int], Set[int]]]:
-    """
-    Identifies connected components in the (k-1)-shell and the collapse nodes in each,
-    using the definition from the FastCM+ paper.
-    """
     core = nx.core_number(G)
-    shell_nodes = [u for u in G.nodes if core[u] == k - 1]
-    shell_subgraph = G.subgraph(shell_nodes)
-    components = list(nx.connected_components(shell_subgraph))
+    shell_nodes = {u for u in G.nodes if core[u] == k - 1}
 
-    result = []
+    if not shell_nodes:
+        return []
+
+    k_minus_1_core = {u for u in G.nodes if core[u] >= k - 1}
+    components = list(nx.connected_components(G.subgraph(shell_nodes)))
+    results = []
+
     for comp in components:
         collapse_nodes = set()
         for u in comp:
-            neighbors_in_k_minus_1_core = [v for v in G.neighbors(u) if core[v] >= k - 1]
-            if len(neighbors_in_k_minus_1_core) == k - 1:
+            neighbors = [v for v in G.neighbors(u) if v in k_minus_1_core]
+            if len(neighbors) == k - 1:
                 collapse_nodes.add(u)
-        result.append((comp, collapse_nodes))
+        results.append((comp, collapse_nodes))
 
-    return result
+    return results
 
 
-def estimate_complete_conversion_cost(
-    G: nx.Graph,
-    component_nodes: Set[int],
-    collapse_nodes: Set[int],
-    k: int
-) -> int:
-    """
-    Estimates the number of edges required to completely convert all collapse nodes
-    in a component into the k-core using the FastCM+ complete conversion strategy.
-    """
+def estimate_complete_conversion_cost(G: nx.Graph, component: Set[int], collapse_nodes: Set[int], k: int) -> int:
     core = nx.core_number(G)
-    k_core_nodes = {u for u in G.nodes if core[u] >= k}
+    k_core = {u for u in G.nodes if core[u] >= k}
+    n = len(collapse_nodes)
 
-    collapse_count = len(collapse_nodes)
-    if collapse_count == 0:
+    if n == 0:
         return 0
 
-    cost = collapse_count // 2
-    if collapse_count % 2 == 1:
-        target_set = component_nodes | k_core_nodes
-        if target_set:
+    cost = n // 2
+    if n % 2 == 1:
+        if component | k_core:
             cost += 1
         else:
-            raise RuntimeError("No valid connection target for remaining collapse node")
+            raise RuntimeError("No valid target for the remaining collapse node")
 
     return cost
 
 
-def select_components_dp_under_budget(
-    component_info: List[Tuple[Set[int], Set[int], int]],
-    budget: int
-) -> List[Tuple[Set[int], Set[int]]]:
-    """
-    Selects the best subset of components to convert within the given edge budget using dynamic programming.
-    Each component has:
-        - cost = estimated edge cost to convert (not collapse node count)
-        - value = number of promoted nodes (component size)
-    """
+def select_components_dp_under_budget(component_info: List[Tuple[Set[int], Set[int], int]], budget: int) -> List[Tuple[Set[int], Set[int]]]:
     n = len(component_info)
     dp = [[0] * (budget + 1) for _ in range(n + 1)]
 
-    values = [len(comp_nodes) for comp_nodes, _, _ in component_info]
+    values = [len(c) for c, _, _ in component_info]
     costs = [cost for _, _, cost in component_info]
 
     for i in range(1, n + 1):
         for w in range(budget + 1):
             if costs[i - 1] <= w:
-                dp[i][w] = max(
-                    dp[i - 1][w],
-                    dp[i - 1][w - costs[i - 1]] + values[i - 1]
-                )
+                dp[i][w] = max(dp[i - 1][w], dp[i - 1][w - costs[i - 1]] + values[i - 1])
             else:
                 dp[i][w] = dp[i - 1][w]
 
@@ -87,131 +65,105 @@ def select_components_dp_under_budget(
     return selected
 
 
-def apply_component_conversions(
-    G: nx.Graph,
-    selected_components: List[Tuple[Set[int], Set[int]]],
-    k: int
-) -> Tuple[nx.Graph, List[Tuple[int, int]]]:
-    """
-    Applies complete conversions to selected components by adding the minimum
-    number of edges required to promote all collapse nodes into the k-core.
-    Follows Algorithm 1 from the FastCM+ paper.
-    """
+def apply_complete_conversion(G: nx.Graph, component: Set[int], collapse_nodes: Set[int], k: int) -> List[Tuple[int, int]]:
+    if not collapse_nodes:
+        return []
+
+    added_edges = []
+    core = nx.core_number(G)
+    k_core = {u for u in G.nodes if core[u] >= k}
+    used = set()
+    nodes = list(collapse_nodes)
+
+    for i in range(len(nodes)):
+        if nodes[i] in used:
+            continue
+        u = nodes[i]
+        for j in range(i + 1, len(nodes)):
+            v = nodes[j]
+            if v not in used and not G.has_edge(u, v):
+                added_edges.append((u, v))
+                used.update([u, v])
+                break
+
+    leftovers = [u for u in nodes if u not in used]
+    for u in leftovers:
+        targets = sorted(v for v in (component | k_core) - {u} if not G.has_edge(u, v))
+        if targets:
+            added_edges.append((u, targets[0]))
+        else:
+            raise RuntimeError(f"No valid target for node {u}")
+
+    return added_edges
+
+
+def apply_component_conversions(G: nx.Graph, components: List[Tuple[Set[int], Set[int]]], k: int) -> Tuple[nx.Graph, List[Tuple[int, int]]]:
     G_reinforced = G.copy()
     added_edges = []
 
-    core = nx.core_number(G)
-    k_core_nodes = {u for u in G.nodes if core[u] >= k}
-
-    for comp_nodes, collapse_nodes in selected_components:
-        collapse_nodes = sorted(collapse_nodes)
-
-        for i in range(0, len(collapse_nodes) - 1, 2):
-            u, v = collapse_nodes[i], collapse_nodes[i + 1]
-            if not G_reinforced.has_edge(u, v):
-                G_reinforced.add_edge(u, v)
-                added_edges.append((u, v))
-
-        if len(collapse_nodes) % 2 == 1:
-            last = collapse_nodes[-1]
-            target_set = comp_nodes | k_core_nodes
-            target_set = [v for v in target_set if v != last and not G_reinforced.has_edge(last, v)]
-
-            if target_set:
-                v = sorted(target_set)[0]
-                G_reinforced.add_edge(last, v)
-                added_edges.append((last, v))
-            else:
-                raise RuntimeError(f"No valid target found for collapse node {last}")
+    for comp, collapse in components:
+        try:
+            new_edges = apply_complete_conversion(G_reinforced, comp, collapse, k)
+            for u, v in new_edges:
+                if not G_reinforced.has_edge(u, v):
+                    G_reinforced.add_edge(u, v)
+                    added_edges.append((u, v))
+        except RuntimeError as e:
+            print(f"Skipping component: {e}")
+            continue
 
     return G_reinforced, added_edges
 
-def fastcm_plus_reinforce(G: nx.Graph, k: int = None, budget: int = 10) -> Tuple[nx.Graph, List[Tuple[int, int]]]: # type: ignore
-    """
-    Main FastCM+ algorithm that orchestrates all components.
-    
-    Parameters:
-        G: Input graph
-        k: Target k-core to maximize (if None, uses max_core + 1)
-        budget: Number of edges that can be added
-        
-    Returns:
-        Tuple of (reinforced_graph, added_edges)
-    """
-    # Determine target k-core
+
+def fastcm_plus_reinforce(G: nx.Graph, k: int = None, budget: int = 10) -> Tuple[nx.Graph, List[Tuple[int, int]]]:
     if k is None:
-        current_cores = nx.core_number(G)
-        if not current_cores:
+        core_vals = nx.core_number(G)
+        if not core_vals:
             return G.copy(), []
-        max_core = max(current_cores.values())
-        k = max_core + 1  # Try to expand to next level
-    
-    # Check if (k-1)-shell exists
-    core_numbers = nx.core_number(G)
-    k_minus_1_shell = {node for node, core_val in core_numbers.items() if core_val == k - 1}
-    
-    if not k_minus_1_shell:
-        # No (k-1)-shell exists, cannot improve k-core
+        k = max(core_vals.values()) + 1
+
+    core = nx.core_number(G)
+    shell = {u for u, c in core.items() if c == k - 1}
+    if not shell:
         return G.copy(), []
-    
-    # Step 1: Get (k-1)-shell components with collapse nodes
+
     try:
-        components_info = get_shell_components_with_collapse_nodes(G, k)
+        components = get_shell_components_with_collapse_nodes(G, k)
     except Exception:
         return G.copy(), []
-    
-    if not components_info:
+
+    if not components:
         return G.copy(), []
-    
-    # Step 2: Calculate conversion costs for each component
-    component_costs = []
-    for comp_nodes, collapse_nodes in components_info:
+
+    component_info = []
+    for comp, collapse in components:
         try:
-            cost = estimate_complete_conversion_cost(G, comp_nodes, collapse_nodes, k)
-            component_costs.append((comp_nodes, collapse_nodes, cost))
+            cost = estimate_complete_conversion_cost(G, comp, collapse, k)
+            component_info.append((comp, collapse, cost))
         except RuntimeError:
-            # Skip components that can't be converted
             continue
-    
-    if not component_costs:
+
+    if not component_info:
         return G.copy(), []
-    
-    # Step 3: Select best components using dynamic programming
+
     try:
-        selected_components = select_components_dp_under_budget(component_costs, budget)
+        selected = select_components_dp_under_budget(component_info, budget)
     except Exception:
         return G.copy(), []
-    
-    if not selected_components:
+
+    if not selected:
         return G.copy(), []
-    
-    # Step 4: Apply conversions to selected components
+
     try:
-        G_reinforced, added_edges = apply_component_conversions(G, selected_components, k)
-        return G_reinforced, added_edges
+        return apply_component_conversions(G, selected, k)
     except Exception:
         return G.copy(), []
 
 
 def fastcm_reinforce(G: nx.Graph, budget: int = 10) -> nx.Graph:
-    """
-    Simplified interface for FastCM+ that just returns the reinforced graph.
-    Matches the interface pattern of MRKC for easy comparison.
-    
-    Parameters:
-        G: Input graph
-        budget: Number of edges that can be added
-        
-    Returns:
-        Reinforced graph
-    """
     G_reinforced, _ = fastcm_plus_reinforce(G, budget=budget)
     return G_reinforced
 
 
-# For backwards compatibility and testing
 def fastcm_plus(G: nx.Graph, k: int, budget: int) -> Tuple[nx.Graph, List[Tuple[int, int]]]:
-    """
-    Alternative interface that requires explicit k parameter.
-    """
     return fastcm_plus_reinforce(G, k=k, budget=budget)
