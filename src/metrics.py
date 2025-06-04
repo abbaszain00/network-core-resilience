@@ -284,5 +284,3 @@ def impact_efficiency(G_original, G_reinforced, attack_type="degree", attack_int
     
     return improvement / edges_added if edges_added > 0 else 0
 
-from metrics import core_resilience, measure_damage, followers_gained, impact_efficiency
-from attacks import attack_network
