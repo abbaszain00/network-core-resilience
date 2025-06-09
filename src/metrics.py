@@ -251,36 +251,29 @@ def followers_gained(G_original, G_reinforced, k=None):
     return followers
 
 
-def impact_efficiency(G_original, G_reinforced, attack_type="degree", attack_intensity=0.1, metric='core_damage'):
+def impact_efficiency(G_original, reinforce_func, attack_type="degree", attack_intensity=0.1, metric='core_damage', budget=10):
     """
-    Resilience improvement per edge added - measures cost-effectiveness.
-    Key metric for comparing MRKC vs FastCM+ efficiency.
-    
-    Parameters:
-        G_original: Original network
-        G_reinforced: Reinforced network  
-        attack_type: Type of attack to test against
-        attack_intensity: Fraction of nodes to remove
-        metric: Damage metric to measure improvement in
-        
-    Returns:
-        float: Improvement per edge added
+    Measures resilience improvement per edge added after applying reinforcement and attack.
     """
     from attacks import attack_network
+
+    # Reinforce the graph
+    G_reinforced, _ = reinforce_func(G_original, budget)
     
-    # Attack both networks
+    # Attack both graphs
     G_orig_attacked, _ = attack_network(G_original, attack_type, attack_intensity)
-    G_reinforced_attacked, _ = attack_network(G_reinforced, attack_type, attack_intensity)
+    G_reinf_attacked, _ = attack_network(G_reinforced, attack_type, attack_intensity)
+
+    # Measure damage
+    damage_orig = measure_damage(G_original, G_orig_attacked)
+    damage_reinf = measure_damage(G_reinforced, G_reinf_attacked)
     
-    # Measure damages
-    orig_damage = measure_damage(G_original, G_orig_attacked)
-    reinforced_damage = measure_damage(G_reinforced, G_reinforced_attacked)
-    
-    # Calculate improvement
-    improvement = orig_damage[metric] - reinforced_damage[metric]
-    
-    # Calculate cost
+    # Improvement in damage
+    improvement = damage_orig[metric] - damage_reinf[metric]
+
+    # Cost: count edges added
     edges_added = G_reinforced.number_of_edges() - G_original.number_of_edges()
     
     return improvement / edges_added if edges_added > 0 else 0
+
 
