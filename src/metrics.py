@@ -2,59 +2,90 @@ import networkx as nx
 from scipy import stats
 import numpy as np
 
-def core_resilience(G_original, G_attacked, top_percent=50):
+def core_resilience(G_original, G_attacked, method='max_core_ratio', top_percent=50):
     """
-    Calculate core resilience as defined in the MRKC paper.
-    Measures correlation between core number rankings before and after attack.
+    Calculate core resilience using different methods.
     
     Parameters:
         G_original: Original network
         G_attacked: Network after attack
-        top_percent: Percentage of top nodes to consider (default 50%)
+        method: 'max_core_ratio' (default), 'ranking_correlation', or 'avg_core_preservation'
+        top_percent: For ranking correlation method only
     
     Returns:
-        float: Kendall's tau correlation coefficient
+        float: Resilience score (0.0 = total loss, 1.0 = no damage)
     """
-    # Get core numbers for both networks
-    cores_orig = nx.core_number(G_original)
-    cores_attack = nx.core_number(G_attacked)
+    if method == 'max_core_ratio':
+        orig_cores = nx.core_number(G_original)
+        attack_cores = nx.core_number(G_attacked)
+        
+        orig_max = max(orig_cores.values()) if orig_cores else 0
+        attack_max = max(attack_cores.values()) if attack_cores else 0
+        
+        return attack_max / orig_max if orig_max > 0 else 1.0
     
-    # Get top nodes by core number in original network
-    num_top = max(1, int(top_percent / 100.0 * G_original.number_of_nodes()))
-    top_nodes = sorted(cores_orig.items(), key=lambda x: x[1], reverse=True)[:num_top]
-    top_node_ids = [node for node, _ in top_nodes]
+    elif method == 'avg_core_preservation':
+        orig_cores = nx.core_number(G_original)
+        attack_cores = nx.core_number(G_attacked)
+        
+        common_nodes = set(orig_cores.keys()) & set(attack_cores.keys())
+        if not common_nodes:
+            return 0.0
+        
+        total_preservation = 0
+        for node in common_nodes:
+            orig_core = orig_cores[node]
+            attack_core = attack_cores[node]
+            preservation = attack_core / orig_core if orig_core > 0 else 1.0
+            total_preservation += preservation
+        
+        return total_preservation / len(common_nodes)
     
-    # Get rankings for these nodes in both networks
-    orig_rankings = []
-    attack_rankings = []
+    elif method == 'ranking_correlation':
+        cores_orig = nx.core_number(G_original)
+        cores_attack = nx.core_number(G_attacked)
+        
+        num_top = max(1, int(top_percent / 100.0 * G_original.number_of_nodes()))
+        top_nodes = sorted(cores_orig.items(), key=lambda x: x[1], reverse=True)[:num_top]
+        top_node_ids = [node for node, _ in top_nodes]
+        
+        orig_rankings = []
+        attack_rankings = []
+        
+        for node in top_node_ids:
+            orig_rankings.append(cores_orig[node])
+            attack_rankings.append(cores_attack.get(node, 0))
+        
+        if len(set(orig_rankings)) <= 1 or len(set(attack_rankings)) <= 1:
+            return 0.0
+        
+        try:
+            correlation, _ = stats.kendalltau(orig_rankings, attack_rankings)
+            return correlation if abs(correlation) < 1.0 else 0.0
+        except:
+            return 0.0
     
-    for node in top_node_ids:
-        orig_rankings.append(cores_orig[node])
-        # If node was removed in attack, core number = 0
-        attack_rankings.append(cores_attack.get(node, 0))
-    
-    # Calculate Kendall's tau correlation
-    if len(set(orig_rankings)) <= 1 or len(set(attack_rankings)) <= 1:
-        return 0.0  # No variation to correlate
-    
-    try:
-        correlation, _ = stats.kendalltau(orig_rankings, attack_rankings)
-        return correlation if abs(correlation) < 1.0 else 0.0 # type: ignore
-    except:
-        return 0.0
+    else:
+        raise ValueError(f"Unknown method: {method}")
 
 
-def measure_damage(G_original, G_attacked):
+def measure_damage(G_original, G_attacked, resilience_method='max_core_ratio'):
     """
     Measure various types of network damage from attack.
     Returns comprehensive damage metrics used in resilience literature.
+    
+    Parameters:
+        G_original: Original network before attack
+        G_attacked: Network after attack
+        resilience_method: Method for calculating core resilience
+    
+    Returns:
+        dict: Dictionary containing all damage metrics
     """
-    # Basic size metrics
     orig_nodes = G_original.number_of_nodes()
     attack_nodes = G_attacked.number_of_nodes()
     nodes_lost = orig_nodes - attack_nodes
     
-    # Core structure damage
     orig_cores = nx.core_number(G_original)
     attack_cores = nx.core_number(G_attacked)
     
@@ -62,11 +93,9 @@ def measure_damage(G_original, G_attacked):
     attack_max_core = max(attack_cores.values()) if attack_cores else 0
     core_damage = orig_max_core - attack_max_core
     
-    # Connectivity damage
     orig_components = nx.number_connected_components(G_original)
     attack_components = nx.number_connected_components(G_attacked)
     
-    # Largest component size (standard resilience metric)
     if G_attacked.number_of_nodes() == 0:
         largest_component = 0
     elif nx.is_connected(G_attacked):
@@ -74,8 +103,7 @@ def measure_damage(G_original, G_attacked):
     else:
         largest_component = len(max(nx.connected_components(G_attacked), key=len))
     
-    # Calculate core resilience
-    resilience = core_resilience(G_original, G_attacked)
+    resilience = core_resilience(G_original, G_attacked, method=resilience_method)
     
     return {
         'nodes_removed': nodes_lost,
@@ -103,7 +131,7 @@ def compare_resilience(results_dict, metric='core_damage'):
         metric: Which damage metric to compare
     
     Returns:
-        Comparison summary
+        dict: Comparison summary with best/worst performers
     """
     comparison = {}
     
@@ -114,7 +142,6 @@ def compare_resilience(results_dict, metric='core_damage'):
     if not comparison:
         return {}
     
-    # Find best and worst
     best_condition = min(comparison.items(), key=lambda x: x[1])
     worst_condition = max(comparison.items(), key=lambda x: x[1])
     
@@ -127,16 +154,17 @@ def compare_resilience(results_dict, metric='core_damage'):
     }
 
 
-def resilience_summary(G_original, attack_results):
+def resilience_summary(G_original, attack_results, resilience_method='max_core_ratio'):
     """
     Create a summary of resilience across different attack types.
     
     Parameters:
         G_original: Original network
         attack_results: Dict of {attack_type: G_attacked}
+        resilience_method: Method for calculating core resilience
     
     Returns:
-        Summary of resilience metrics
+        dict: Summary of resilience metrics across all attacks
     """
     summary = {
         'network_size': G_original.number_of_nodes(),
@@ -145,82 +173,13 @@ def resilience_summary(G_original, attack_results):
     }
     
     for attack_type, G_attacked in attack_results.items():
-        damage = measure_damage(G_original, G_attacked)
+        damage = measure_damage(G_original, G_attacked, resilience_method=resilience_method)
         summary['attacks'][attack_type] = damage
     
-    # Overall resilience score (average core resilience across attacks)
     resilience_scores = [info['core_resilience'] for info in summary['attacks'].values()]
     summary['overall_resilience'] = np.mean(resilience_scores) if resilience_scores else 0.0
     
     return summary
-
-
-def print_damage_report(damage_info, title="Network Damage Report"):
-    """Print a formatted damage report."""
-    print(f"\n{title}")
-    print("=" * len(title))
-    print(f"Nodes removed: {damage_info['nodes_removed']} ({damage_info['removal_fraction']:.1%})")
-    print(f"Max k-core: {damage_info['max_core_original']} → {damage_info['max_core_attacked']} "
-          f"(damage: {damage_info['core_damage']})")
-    print(f"Components: {damage_info['components_original']} → {damage_info['components_attacked']} "
-          f"(fragmentation: {damage_info['fragmentation']})")
-    print(f"Largest component: {damage_info['largest_component']} nodes "
-          f"({damage_info['largest_component_fraction']:.1%})")
-    print(f"Core resilience: {damage_info['core_resilience']:.3f}")
-
-
-def print_resilience_comparison(comparison_results):
-    """Print comparison between different algorithms/conditions."""
-    print(f"\nResilience Comparison ({comparison_results['metric']})")
-    print("-" * 40)
-    
-    for condition, value in comparison_results['results'].items():
-        marker = " ← BEST" if condition == comparison_results['best'][0] else ""
-        marker = " ← WORST" if condition == comparison_results['worst'][0] else marker
-        print(f"{condition:>15}: {value:.3f}{marker}")
-    
-    print(f"\nImprovement: {comparison_results['improvement']:.3f} "
-          f"({comparison_results['best'][0]} vs {comparison_results['worst'][0]})")
-
-
-def evaluate_algorithm_resilience(G, reinforce_func, attack_types=['degree', 'kcore'], 
-                                 attack_intensity=0.1, budget=50):
-    """
-    Evaluate an algorithm's resilience against multiple attack types.
-    
-    Parameters:
-        G: Original network
-        reinforce_func: Function that takes (G, budget) and returns reinforced network
-        attack_types: List of attack types to test
-        attack_intensity: Attack intensity (fraction of nodes)
-        budget: Reinforcement budget
-    
-    Returns:
-        Dictionary with resilience results
-    """
-    from attacks import attack_network
-    
-    # Apply reinforcement
-    G_reinforced = reinforce_func(G, budget)
-    
-    results = {
-        'original_network': G,
-        'reinforced_network': G_reinforced,
-        'budget': budget,
-        'attack_results': {}
-    }
-    
-    # Test each attack type
-    for attack_type in attack_types:
-        G_attacked, removed = attack_network(G_reinforced, attack_type, attack_intensity)
-        damage = measure_damage(G_reinforced, G_attacked)
-        results['attack_results'][attack_type] = {
-            'attacked_network': G_attacked,
-            'removed_nodes': removed,
-            'damage': damage
-        }
-    
-    return results
 
 
 def followers_gained(G_original, G_reinforced, k=None):
@@ -249,31 +208,3 @@ def followers_gained(G_original, G_reinforced, k=None):
             followers += 1
     
     return followers
-
-
-def impact_efficiency(G_original, reinforce_func, attack_type="degree", attack_intensity=0.1, metric='core_damage', budget=10):
-    """
-    Measures resilience improvement per edge added after applying reinforcement and attack.
-    """
-    from attacks import attack_network
-
-    # Reinforce the graph
-    G_reinforced, _ = reinforce_func(G_original, budget)
-    
-    # Attack both graphs
-    G_orig_attacked, _ = attack_network(G_original, attack_type, attack_intensity)
-    G_reinf_attacked, _ = attack_network(G_reinforced, attack_type, attack_intensity)
-
-    # Measure damage
-    damage_orig = measure_damage(G_original, G_orig_attacked)
-    damage_reinf = measure_damage(G_reinforced, G_reinf_attacked)
-    
-    # Improvement in damage
-    improvement = damage_orig[metric] - damage_reinf[metric]
-
-    # Cost: count edges added
-    edges_added = G_reinforced.number_of_edges() - G_original.number_of_edges()
-    
-    return improvement / edges_added if edges_added > 0 else 0
-
-
