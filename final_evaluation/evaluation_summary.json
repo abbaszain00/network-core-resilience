@@ -1,0 +1,16 @@
+{
+  "experiment_overview": {
+    "total_runs": 6720,
+    "networks_tested": 14,
+    "algorithms": [
+      "MRKC",
+      "FastCM+"
+    ],
+    "attack_types": [
+      "degree",
+      "kcore",
+      "betweenness",
+      "random"
+    ],
+    "budget_levels": [
+      

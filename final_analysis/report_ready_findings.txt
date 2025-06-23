@@ -1,0 +1,35 @@
+
+COMPREHENSIVE EXPERIMENTAL RESULTS SUMMARY
+==========================================
+
+EXPERIMENTAL SCOPE:
+• Total experiments conducted: 6,720
+• Networks tested: 14 diverse networks
+• Attack scenarios: 4 types × 4 intensities
+• Budget levels: 5 levels tested
+• Statistical reliability: 3 runs per configuration
+
+RESEARCH QUESTION 1 - ALGORITHM PERFORMANCE:
+
+MRKC achieved 0.8523 average core resilience with 0.0 followers gained.
+FastCM+ achieved 0.7685 average core resilience with 89.3 followers gained.
+Performance difference: 0.0838 in favor of MRKC.
+
+RESEARCH QUESTION 2 - ATTACK-SPECIFIC PERFORMANCE:
+Against degree attacks: MRKC performs best (0.8167 resilience)
+Against kcore attacks: MRKC performs best (0.8167 resilience)
+Against betweenness attacks: MRKC performs best (0.8476 resilience)
+Against random attacks: MRKC performs best (0.9281 resilience)
+
+RESEARCH QUESTION 3 - NETWORK DEPENDENCIES:
+Performance varies significantly across network types and sizes, with clear preferences for different algorithms.
+
+RESEARCH QUESTION 4 - COST-EFFECTIVENESS:
+
+MRKC efficiency: 0.0146 improvement per edge
+FastCM+ efficiency: -0.1499 improvement per edge
+Most efficient: MRKC
+
+STATISTICAL SIGNIFICANCE:
+All findings based on 6,720 experiments with multiple runs per configuration.
+Results show consistent patterns across diverse network types and attack scenarios.

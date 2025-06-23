@@ -1,0 +1,3 @@
+algorithm,Avg_Resilience,Resilience_Std,Avg_Followers,Total_Followers,Avg_Efficiency,Efficiency_Std,Avg_Edges
+FastCM+,0.7685,0.1799,89.2571,299904,-0.1499,0.2404,3.1429
+MRKC,0.8523,0.1665,0.0,0,0.0146,0.0551,10.3286
