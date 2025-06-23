@@ -22,51 +22,38 @@ def get_test_graph(type="scale_free", n=30, seed=42):
         raise ValueError(f"Unknown graph type: {type}")
 
 
-def generate_networks_batch(sizes=[100, 500, 1000], seed=42):
-    """Generate multiple synthetic networks for experiments."""
-    networks = {}
-    types = ["random", "scale_free", "small_world"]
-    
-    for size in sizes:
-        for net_type in types:
-            name = f"{net_type}_{size}"
-            networks[name] = get_test_graph(net_type, n=size, seed=seed)
-    
-    return networks
-
-
-def get_parameter_variants(base_size=500, seed=42):
-    """Create networks with different parameters for testing sensitivity."""
-    networks = {}
-    
-    # Random graphs with different densities
-    for p in [0.1, 0.2, 0.3]:
-        name = f"random_{base_size}_dense{int(p*10)}"
-        networks[name] = nx.erdos_renyi_graph(n=base_size, p=p, seed=seed)
-    
-    # Scale-free with different attachment rates
-    for m in [1, 2, 3]:
-        name = f"scalefree_{base_size}_m{m}"
-        networks[name] = nx.barabasi_albert_graph(n=base_size, m=m, seed=seed)
-    
-    # Small-world with different rewiring
-    for p in [0.05, 0.1, 0.2]:
-        name = f"smallworld_{base_size}_rewire{int(p*100)}"
-        networks[name] = nx.watts_strogatz_graph(n=base_size, k=4, p=p, seed=seed)
-    
-    return networks
-
-
 def get_all_synthetic(max_nodes=5000, include_variants=False):
-    """Load all synthetic networks for experiments."""
+    """Load essential synthetic networks for controlled analysis."""
     networks = {}
     
-    # Standard sizes
-    sizes = [s for s in [100, 500, 1000, 2000] if s <= max_nodes]
-    networks.update(generate_networks_batch(sizes))
+    print("Loading essential synthetic networks...")
     
+    # Essential networks only - one of each major topology class
+    essential_configs = [
+        ('random', 500),      # Erdős-Rényi baseline
+        ('scale_free', 500),  # Barabási-Albert 
+        ('small_world', 500), # Watts-Strogatz
+    ]
+    
+    # Add one larger network for scale testing
+    if max_nodes >= 1000:
+        essential_configs.append(('scale_free', 1000))  # Most real networks are scale-free
+    
+    for net_type, size in essential_configs:
+        if size <= max_nodes:
+            name = f"{net_type}_{size}"
+            try:
+                networks[name] = get_test_graph(net_type, n=size, seed=42)
+                print(f"Generated {name}")
+            except Exception as e:
+                print(f"Failed to generate {name}: {e}")
+    
+    print(f"Generated {len(networks)} essential synthetic networks")
+    
+    # Warning if variants requested (not recommended for final evaluation)
     if include_variants:
-        networks.update(get_parameter_variants(min(500, max_nodes)))
+        print("Warning: include_variants=True not supported in streamlined version")
+        print("Use essential networks only for proper real/synthetic balance")
     
     return networks
 
@@ -91,39 +78,28 @@ def network_stats(G):
 
 def print_network_info(networks):
     """Print summary of networks."""
-    print(f"Generated {len(networks)} synthetic networks:")
-    print()
+    print(f"Synthetic networks ({len(networks)} total):")
     
-    # Group by type
-    by_type = {}
-    for name, G in networks.items():
-        net_type = name.split('_')[0]
-        if net_type not in by_type:
-            by_type[net_type] = []
-        by_type[net_type].append((name, G))
-    
-    for net_type in ['random', 'scale', 'scalefree', 'small', 'smallworld']:
-        if net_type in by_type or any(net_type in key for key in by_type.keys()):
-            # Find matching networks
-            matches = []
-            for key, nets in by_type.items():
-                if net_type in key:
-                    matches.extend(nets)
-            
-            if matches:
-                print(f"{net_type.upper()} networks:")
-                for name, G in sorted(matches, key=lambda x: x[1].number_of_nodes()):
-                    stats = network_stats(G)
-                    print(f"  {name}: {stats['nodes']} nodes, {stats['edges']} edges, "
-                          f"k-core={stats['max_core']}")
-                print()
+    for name, G in sorted(networks.items(), key=lambda x: x[1].number_of_nodes()):
+        stats = network_stats(G)
+        print(f"  {name}: {stats['nodes']} nodes, {stats['edges']} edges, k-core={stats['max_core']}")
 
 
 if __name__ == "__main__":
-    # Test basic generation
-    test_net = get_test_graph("scale_free", 100)
-    print(f"Test network: {test_net.number_of_nodes()} nodes")
+    print("STREAMLINED SYNTHETIC NETWORK GENERATION")
+    print("=" * 50)
     
-    # Generate batch for experiments
-    networks = get_all_synthetic(max_nodes=1000)
+    # Generate essential networks
+    networks = get_all_synthetic(max_nodes=1000, include_variants=False)
     print_network_info(networks)
+    
+    print(f"\nBalance projection:")
+    print(f"• Synthetic: {len(networks)} networks")
+    print(f"• Expected real: ~5-6 networks")
+    print(f"• Total: ~{len(networks) + 5} networks")
+    print(f"• Real percentage: ~{5/(len(networks) + 5)*100:.0f}%")
+    
+    if 5/(len(networks) + 5) >= 0.6:
+        print("✅ Will achieve 60%+ real balance")
+    else:
+        print("⚠️  May need more real networks")
