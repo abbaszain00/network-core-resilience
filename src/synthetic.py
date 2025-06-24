@@ -1,105 +1,98 @@
 import networkx as nx
 
-def get_test_graph(type="scale_free", n=30, seed=42):
-    """
-    Returns a synthetic test graph of the given type.
-
-    Parameters:
-        type (str): One of "random", "scale_free", or "small_world"
-        n (int): Number of nodes
-        seed (int): Random seed for reproducibility
-
-    Returns:
-        networkx.Graph: Generated graph
-    """
-    if type == "random":
-        return nx.erdos_renyi_graph(n=n, p=0.2, seed=seed)
-    elif type == "small_world":
-        return nx.watts_strogatz_graph(n=n, k=4, p=0.1, seed=seed)
-    elif type == "scale_free":
-        return nx.barabasi_albert_graph(n=n, m=2, seed=seed)
+def create_synthetic_network(network_type, n=500, seed=42):
+    """Create a synthetic network of given type."""
+    
+    if network_type == "random":
+        # Erdos-Renyi random graph
+        return nx.erdos_renyi_graph(n=n, p=0.1, seed=seed)
+    elif network_type == "scale_free":
+        # Barabasi-Albert preferential attachment
+        return nx.barabasi_albert_graph(n=n, m=3, seed=seed)
+    elif network_type == "small_world":
+        # Watts-Strogatz small world
+        return nx.watts_strogatz_graph(n=n, k=6, p=0.3, seed=seed)
     else:
-        raise ValueError(f"Unknown graph type: {type}")
-
+        raise ValueError(f"Unknown type: {network_type}")
 
 def get_all_synthetic(max_nodes=5000, include_variants=False):
-    """Load essential synthetic networks for controlled analysis."""
+    """Get synthetic networks for testing."""
     networks = {}
     
-    print("Loading essential synthetic networks...")
+    print("Creating synthetic networks...")
     
-    # Essential networks only - one of each major topology class
-    essential_configs = [
-        ('random', 500),      # Erdős-Rényi baseline
-        ('scale_free', 500),  # Barabási-Albert 
-        ('small_world', 500), # Watts-Strogatz
+    # Basic synthetic networks for comparison
+    types_to_create = [
+        ("random", 500),
+        ("scale_free", 500),
+        ("small_world", 500)
     ]
     
-    # Add one larger network for scale testing
+    # Add larger version if we have space
     if max_nodes >= 1000:
-        essential_configs.append(('scale_free', 1000))  # Most real networks are scale-free
+        types_to_create.append(("scale_free", 1000))
     
-    for net_type, size in essential_configs:
+    for net_type, size in types_to_create:
         if size <= max_nodes:
-            name = f"{net_type}_{size}"
             try:
-                networks[name] = get_test_graph(net_type, n=size, seed=42)
-                print(f"Generated {name}")
+                G = create_synthetic_network(net_type, n=size)
+                
+                # Make sure it's connected
+                if not nx.is_connected(G):
+                    # Take largest component
+                    largest = max(nx.connected_components(G), key=len)
+                    G = G.subgraph(largest).copy()
+                
+                name = f"synthetic_{net_type}_{size}"
+                networks[name] = G
+                print(f"Created {name}: {G.number_of_nodes()} nodes")
+                
             except Exception as e:
-                print(f"Failed to generate {name}: {e}")
+                print(f"Failed to create {net_type}: {e}")
     
-    print(f"Generated {len(networks)} essential synthetic networks")
-    
-    # Warning if variants requested (not recommended for final evaluation)
-    if include_variants:
-        print("Warning: include_variants=True not supported in streamlined version")
-        print("Use essential networks only for proper real/synthetic balance")
-    
+    print(f"Created {len(networks)} synthetic networks")
     return networks
 
-
-def network_stats(G):
-    """Basic network statistics."""
-    if G.number_of_nodes() == 0:
-        return {}
+def get_basic_stats(G):
+    """Get basic network statistics."""
+    cores = nx.core_number(G)
     
-    core_nums = nx.core_number(G)
-    degrees = dict(G.degree())
-    
-    return {
+    stats = {
         'nodes': G.number_of_nodes(),
         'edges': G.number_of_edges(),
-        'density': round(nx.density(G), 3),
-        'max_core': max(core_nums.values()) if core_nums else 0,
-        'avg_degree': round(sum(degrees.values()) / len(degrees), 1) if degrees else 0,
+        'density': round(nx.density(G), 4),
+        'max_core': max(cores.values()) if cores else 0,
         'connected': nx.is_connected(G)
     }
-
-
-def print_network_info(networks):
-    """Print summary of networks."""
-    print(f"Synthetic networks ({len(networks)} total):")
     
-    for name, G in sorted(networks.items(), key=lambda x: x[1].number_of_nodes()):
-        stats = network_stats(G)
-        print(f"  {name}: {stats['nodes']} nodes, {stats['edges']} edges, k-core={stats['max_core']}")
+    # Add clustering if not too big
+    if G.number_of_nodes() <= 1000:
+        try:
+            stats['clustering'] = round(nx.average_clustering(G), 3)
+        except:
+            stats['clustering'] = 0
+    
+    return stats
 
+def print_synthetic_summary(networks):
+    """Print summary of synthetic networks."""
+    print(f"\nSynthetic networks ({len(networks)} total):")
+    
+    for name, G in networks.items():
+        stats = get_basic_stats(G)
+        print(f"  {name}:")
+        print(f"    {stats['nodes']} nodes, {stats['edges']} edges")
+        print(f"    max k-core: {stats['max_core']}, density: {stats['density']}")
+        if 'clustering' in stats:
+            print(f"    clustering: {stats['clustering']}")
 
 if __name__ == "__main__":
-    print("STREAMLINED SYNTHETIC NETWORK GENERATION")
-    print("=" * 50)
+    print("Creating synthetic networks for testing...")
+    networks = get_all_synthetic(max_nodes=1000)
+    print_synthetic_summary(networks)
     
-    # Generate essential networks
-    networks = get_all_synthetic(max_nodes=1000, include_variants=False)
-    print_network_info(networks)
-    
-    print(f"\nBalance projection:")
-    print(f"• Synthetic: {len(networks)} networks")
-    print(f"• Expected real: ~5-6 networks")
-    print(f"• Total: ~{len(networks) + 5} networks")
-    print(f"• Real percentage: ~{5/(len(networks) + 5)*100:.0f}%")
-    
-    if 5/(len(networks) + 5) >= 0.6:
-        print("✅ Will achieve 60%+ real balance")
+    # Simple check
+    if len(networks) >= 3:
+        print("Good - have basic synthetic types")
     else:
-        print("⚠️  May need more real networks")
+        print("Warning - missing some network types")
