@@ -11,6 +11,7 @@ import pandas as pd
 import networkx as nx
 import time
 import json
+import numpy as np
 from pathlib import Path
 
 from synthetic import get_all_synthetic
@@ -19,6 +20,17 @@ from mrkc import mrkc_reinforce
 from fastcm import fastcm_plus_reinforce
 from attacks import attack_network
 from metrics import measure_damage, followers_gained
+
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 class FinalEvaluationSuite:
     """Comprehensive evaluation answering all main research questions."""
@@ -39,11 +51,6 @@ class FinalEvaluationSuite:
         print("\n📚 Loading networks...")
         networks = {}
         
-        # Synthetic networks - comprehensive coverage
-        synthetic_nets = get_all_synthetic(max_nodes=max_network_size, include_variants=True)
-        networks.update(synthetic_nets)
-        print(f"Loaded {len(synthetic_nets)} synthetic networks")
-        
         # Real networks
         try:
             real_nets = get_all_real_networks(max_nodes=max_network_size)
@@ -51,6 +58,11 @@ class FinalEvaluationSuite:
             print(f"Loaded {len(real_nets)} real networks")
         except Exception as e:
             print(f"Could not load real networks: {e}")
+        
+        # Synthetic networks - comprehensive coverage
+        synthetic_nets = get_all_synthetic(max_nodes=max_network_size, include_variants=True)
+        networks.update(synthetic_nets)
+        print(f"Loaded {len(synthetic_nets)} synthetic networks")
         
         print(f"Total networks: {len(networks)}")
         
@@ -211,48 +223,61 @@ class FinalEvaluationSuite:
         resilience_improvement = damage_reinf['core_resilience'] - damage_orig['core_resilience']
         efficiency = core_improvement / len(edges_added) if len(edges_added) > 0 else 0
         
-        # Comprehensive result record
+        # Comprehensive result record - convert numpy types to Python types
         result = {
             # Experiment metadata
             'network': net_name,
             'algorithm': algorithm,
-            'budget': budget,
+            'budget': int(budget),
             'attack_type': attack_type,
-            'attack_intensity': attack_intensity,
-            'run_id': run_id,
+            'attack_intensity': float(attack_intensity),
+            'run_id': int(run_id),
             
-            # Network properties
-            **{f'net_{k}': v for k, v in network_props.items()},
+            # Network properties - convert numpy types
+            **{f'net_{k}': self._convert_numpy(v) for k, v in network_props.items()},
             
             # Reinforcement results
-            'edges_added': len(edges_added),
-            'followers_gained': followers,
-            'reinforce_time': reinforce_time,
+            'edges_added': int(len(edges_added)),
+            'followers_gained': int(followers),
+            'reinforce_time': float(reinforce_time),
             
             # Attack results
-            'nodes_removed_orig': len(removed_orig),
-            'nodes_removed_reinf': len(removed_reinf),
+            'nodes_removed_orig': int(len(removed_orig)),
+            'nodes_removed_reinf': int(len(removed_reinf)),
             
             # Original network damage
-            'orig_core_resilience': damage_orig['core_resilience'],
-            'orig_core_damage': damage_orig['core_damage'],
-            'orig_largest_component_frac': damage_orig['largest_component_fraction'],
-            'orig_fragmentation': damage_orig['fragmentation'],
+            'orig_core_resilience': float(damage_orig['core_resilience']),
+            'orig_core_damage': float(damage_orig['core_damage']),
+            'orig_largest_component_frac': float(damage_orig['largest_component_fraction']),
+            'orig_fragmentation': float(damage_orig['fragmentation']),
             
             # Reinforced network damage
-            'reinf_core_resilience': damage_reinf['core_resilience'],
-            'reinf_core_damage': damage_reinf['core_damage'],
-            'reinf_largest_component_frac': damage_reinf['largest_component_fraction'],
-            'reinf_fragmentation': damage_reinf['fragmentation'],
+            'reinf_core_resilience': float(damage_reinf['core_resilience']),
+            'reinf_core_damage': float(damage_reinf['core_damage']),
+            'reinf_largest_component_frac': float(damage_reinf['largest_component_fraction']),
+            'reinf_fragmentation': float(damage_reinf['fragmentation']),
             
             # Performance metrics
-            'core_improvement': core_improvement,
-            'resilience_improvement': resilience_improvement,
-            'efficiency': efficiency,
-            'relative_improvement': resilience_improvement / damage_orig['core_resilience'] if damage_orig['core_resilience'] > 0 else 0
+            'core_improvement': float(core_improvement),
+            'resilience_improvement': float(resilience_improvement),
+            'efficiency': float(efficiency),
+            'relative_improvement': float(resilience_improvement / damage_orig['core_resilience'] if damage_orig['core_resilience'] > 0 else 0)
         }
         
         return result
+    
+    def _convert_numpy(self, obj):
+        """Convert numpy types to Python native types."""
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (pd.Series, pd.DataFrame)):
+            return obj.to_dict()
+        else:
+            return obj
     
     def save_results(self):
         """Save comprehensive results."""
@@ -266,11 +291,11 @@ class FinalEvaluationSuite:
         csv_path = self.output_dir / "comprehensive_evaluation.csv"
         df.to_csv(csv_path, index=False)
         
-        # Save summary statistics
+        # Save summary statistics with proper JSON encoding
         summary = self.generate_summary_statistics(df)
         summary_path = self.output_dir / "evaluation_summary.json"
         with open(summary_path, 'w') as f:
-            json.dump(summary, f, indent=2)
+            json.dump(summary, f, indent=2, cls=NumpyEncoder)
         
         print(f"💾 Results saved to {csv_path}")
         print(f"📋 Summary saved to {summary_path}")
@@ -282,16 +307,16 @@ class FinalEvaluationSuite:
         
         summary = {
             'experiment_overview': {
-                'total_runs': len(df),
-                'networks_tested': df['network'].nunique(),
+                'total_runs': int(len(df)),
+                'networks_tested': int(df['network'].nunique()),
                 'algorithms': list(df['algorithm'].unique()),
                 'attack_types': list(df['attack_type'].unique()),
-                'budget_levels': sorted(df['budget'].unique()),
-                'attack_intensities': sorted(df['attack_intensity'].unique())
+                'budget_levels': [int(x) for x in sorted(df['budget'].unique())],
+                'attack_intensities': [float(x) for x in sorted(df['attack_intensity'].unique())]
             }
         }
         
-        # Algorithm performance comparison
+        # Algorithm performance comparison - convert to regular Python types
         algo_stats = df.groupby('algorithm').agg({
             'reinf_core_resilience': ['mean', 'std', 'min', 'max'],
             'followers_gained': ['mean', 'std', 'sum'],
@@ -300,20 +325,50 @@ class FinalEvaluationSuite:
             'reinforce_time': ['mean', 'std']
         }).round(4)
         
-        summary['algorithm_performance'] = algo_stats.to_dict()
+        # Convert to regular dict with proper types
+        algo_stats_dict = {}
+        for algo in algo_stats.index:
+            algo_stats_dict[algo] = {}
+            for col in algo_stats.columns:
+                metric_name = f"{col[0]}_{col[1]}"
+                value = algo_stats.loc[algo, col]
+                algo_stats_dict[algo][metric_name] = float(value) if not pd.isna(value) else None
+        
+        summary['algorithm_performance'] = algo_stats_dict
         
         # Attack-specific performance
-        attack_stats = df.groupby(['algorithm', 'attack_type'])['reinf_core_resilience'].mean().unstack().round(4).to_dict()
-        summary['attack_specific_performance'] = attack_stats
+        attack_stats = df.groupby(['algorithm', 'attack_type'])['reinf_core_resilience'].mean().unstack().round(4)
+        attack_stats_dict = {}
+        for algo in attack_stats.index:
+            attack_stats_dict[algo] = {}
+            for attack in attack_stats.columns:
+                value = attack_stats.loc[algo, attack]
+                attack_stats_dict[algo][attack] = float(value) if not pd.isna(value) else None
+        
+        summary['attack_specific_performance'] = attack_stats_dict
         
         # Network type analysis
         if 'net_network_type' in df.columns:
-            network_stats = df.groupby(['net_network_type', 'algorithm'])['reinf_core_resilience'].mean().unstack().round(4).to_dict()
-            summary['network_type_performance'] = network_stats
+            network_stats = df.groupby(['net_network_type', 'algorithm'])['reinf_core_resilience'].mean().unstack().round(4)
+            network_stats_dict = {}
+            for net_type in network_stats.index:
+                network_stats_dict[net_type] = {}
+                for algo in network_stats.columns:
+                    value = network_stats.loc[net_type, algo]
+                    network_stats_dict[net_type][algo] = float(value) if not pd.isna(value) else None
+            
+            summary['network_type_performance'] = network_stats_dict
         
         # Budget effectiveness
-        budget_stats = df.groupby(['algorithm', 'budget'])['efficiency'].mean().unstack().round(4).to_dict()
-        summary['budget_effectiveness'] = budget_stats
+        budget_stats = df.groupby(['algorithm', 'budget'])['efficiency'].mean().unstack().round(4)
+        budget_stats_dict = {}
+        for algo in budget_stats.index:
+            budget_stats_dict[algo] = {}
+            for budget in budget_stats.columns:
+                value = budget_stats.loc[algo, budget]
+                budget_stats_dict[algo][str(budget)] = float(value) if not pd.isna(value) else None
+        
+        summary['budget_effectiveness'] = budget_stats_dict
         
         return summary
     
