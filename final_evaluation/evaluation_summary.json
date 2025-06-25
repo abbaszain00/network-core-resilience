@@ -1,0 +1,101 @@
+{
+  "experiment_overview": {
+    "total_runs": 2400,
+    "networks_tested": 5,
+    "algorithms": [
+      "MRKC",
+      "FastCM+"
+    ],
+    "attack_types": [
+      "degree",
+      "kcore",
+      "betweenness",
+      "random"
+    ],
+    "budget_levels": [
+      5,
+      10,
+      15,
+      20,
+      30
+    ],
+    "attack_intensities": [
+      0.05,
+      0.1,
+      0.15,
+      0.2
+    ]
+  },
+  "algorithm_performance": {
+    "FastCM+": {
+      "reinf_core_resilience_mean": 0.6871,
+      "reinf_core_resilience_std": 0.1632,
+      "reinf_core_resilience_min": 0.3333,
+      "reinf_core_resilience_max": 1.0,
+      "followers_gained_mean": 13.0,
+      "followers_gained_std": 5.0618,
+      "followers_gained_sum": 15600.0,
+      "efficiency_mean": -0.315,
+      "efficiency_std": 0.3331,
+      "core_improvement_mean": -0.6625,
+      "core_improvement_std": 0.4731,
+      "reinforce_time_mean": 0.0005,
+      "reinforce_time_std": 0.0003
+    },
+    "MRKC": {
+      "reinf_core_resilience_mean": 0.8363,
+      "reinf_core_resilience_std": 0.1712,
+      "reinf_core_resilience_min": 0.5,
+      "reinf_core_resilience_max": 1.0,
+      "followers_gained_mean": 0.0,
+      "followers_gained_std": 0.0,
+      "followers_gained_sum": 0.0,
+      "efficiency_mean": 0.0292,
+      "efficiency_std": 0.0868,
+      "core_improvement_mean": 0.205,
+      "core_improvement_std": 0.4507,
+      "reinforce_time_mean": 0.1045,
+      "reinforce_time_std": 0.1372
+    }
+  },
+  "attack_specific_performance": {
+    "FastCM+": {
+      "betweenness": 0.6608,
+      "degree": 0.6292,
+      "kcore": 0.6342,
+      "random": 0.8242
+    },
+    "MRKC": {
+      "betweenness": 0.8389,
+      "degree": 0.7792,
+      "kcore": 0.7814,
+      "random": 0.9458
+    }
+  },
+  "network_type_performance": {
+    "real_world": {
+      "FastCM+": 0.575,
+      "MRKC": 0.7312
+    },
+    "unknown": {
+      "FastCM+": 0.7151,
+      "MRKC": 0.8626
+    }
+  },
+  "budget_effectiveness": {
+    "FastCM+": {
+      "5": -0.315,
+      "10": -0.315,
+      "15": -0.315,
+      "20": -0.315,
+      "30": -0.315
+    },
+    "MRKC": {
+      "5": 0.035,
+      "10": 0.0292,
+      "15": 0.0273,
+      "20": 0.0275,
+      "30": 0.0269
+    }
+  }
+}
