@@ -52,12 +52,8 @@ class FinalEvaluationSuite:
         networks = {}
         
         # Real networks
-        try:
-            real_nets = get_all_real_networks(max_nodes=max_network_size)
-            networks.update(real_nets)
-            print(f"Loaded {len(real_nets)} real networks")
-        except Exception as e:
-            print(f"Could not load real networks: {e}")
+        from shared_networks import get_consistent_networks
+        networks = get_consistent_networks(max_nodes=max_network_size)
         
         # Synthetic networks - comprehensive coverage
         synthetic_nets = get_all_synthetic(max_nodes=max_network_size, include_variants=True)
