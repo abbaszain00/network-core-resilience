@@ -7,6 +7,8 @@ Abbas Zain-Ul-Abidin (K21067382)
 
 import pandas as pd
 import numpy as np
+from scipy import stats
+import matplotlib.pyplot as plt
 
 def quick_analysis():
     """Analyze evaluation results from CSV file."""
@@ -40,13 +42,22 @@ def quick_analysis():
         std_val = resilience_stats.loc[algo, 'std']
         print(f"  {algo}: {mean_val:.3f} ± {std_val:.3f}")
     
-    # Simple comparison
+    # Simple comparison with statistical test
     if 'MRKC' in df['algorithm'].values and 'FastCM+' in df['algorithm'].values:
         mrkc_scores = df[df['algorithm'] == 'MRKC']['reinf_core_resilience']
         fastcm_scores = df[df['algorithm'] == 'FastCM+']['reinf_core_resilience']
         
         difference = mrkc_scores.mean() - fastcm_scores.mean()
         print(f"\nMRKC vs FastCM+ difference: {difference:.3f}")
+        
+        # Statistical significance test
+        t_stat, p_value = stats.ttest_ind(mrkc_scores, fastcm_scores)
+        print(f"Statistical test: t={t_stat:.3f}, p={p_value:.4f}")
+        
+        if p_value < 0.05:
+            print("Result: Statistically significant difference")
+        else:
+            print("Result: No significant difference")
         
         if abs(difference) > 0.01:
             better = "MRKC" if difference > 0 else "FastCM+"
@@ -152,6 +163,43 @@ def quick_analysis():
     
     print(f"- Use {best_expansion} for maximum k-core growth")
     print(f"- Use {best_resilience} for network protection")
+    
+    # Create simple visualization
+    create_basic_plots(df)
+
+def create_basic_plots(df):
+    """Create basic comparison plots."""
+    
+    print(f"\nCreating basic plots...")
+    
+    # Simple boxplot comparison
+    plt.figure(figsize=(8, 6))
+    algorithms = df['algorithm'].unique()
+    data_to_plot = [df[df['algorithm'] == algo]['reinf_core_resilience'] for algo in algorithms]
+    
+    plt.boxplot(data_to_plot, labels=algorithms)
+    plt.title('Algorithm Performance Comparison')
+    plt.ylabel('Core Resilience')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('algorithm_comparison.png', dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    # Attack type performance
+    plt.figure(figsize=(10, 6))
+    attack_perf = df.groupby(['algorithm', 'attack_type'])['reinf_core_resilience'].mean().unstack()
+    attack_perf.plot(kind='bar', width=0.8)
+    plt.title('Performance by Attack Type')
+    plt.ylabel('Core Resilience')
+    plt.xlabel('Algorithm')
+    plt.legend(title='Attack Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.xticks(rotation=0)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('attack_performance.png', dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    print("Plots saved: algorithm_comparison.png, attack_performance.png")
 
 if __name__ == "__main__":
     quick_analysis()
