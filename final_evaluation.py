@@ -286,8 +286,8 @@ def main():
     evaluator = FinalEvaluationSuite()
     
     success = evaluator.run_comprehensive_evaluation(
-        max_network_size=300,
-        runs_per_config=1
+        max_network_size=5000,
+        runs_per_config=3
     )
     
     if success:
