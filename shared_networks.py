@@ -10,7 +10,7 @@ import networkx as nx
 from real_world import get_all_real_networks
 from synthetic import get_all_synthetic
 
-def get_consistent_networks(max_network_size=5000, include_snap=True):
+def get_consistent_networks(max_network_size=6000, include_snap=True):
     """
     Load networks from multiple sources for evaluation.
     
@@ -64,8 +64,10 @@ def get_consistent_networks(max_network_size=5000, include_snap=True):
         builtin_real = [n for n in networks.keys() if any(x in n for x in 
                        ['karate', 'florentine', 'davis', 'miserables', 'petersen', 'house'])]
         
+        # Updated SNAP network detection to include all current SNAP networks
         snap_real = [n for n in networks.keys() if any(x in n for x in 
-                    ['facebook_ego', 'email_enron', 'ca_grqc'])]
+                    ['facebook_ego', 'email_enron', 'ca_grqc', 'bitcoin_alpha', 
+                     'bitcoin_otc', 'wiki_vote', 'email_eu_core',])]
         
         pure_synthetic = [n for n in networks.keys() if 'synthetic' in n]
         
@@ -76,6 +78,12 @@ def get_consistent_networks(max_network_size=5000, include_snap=True):
         print(f"   SNAP real: {len(snap_real)}")
         print(f"   Realistic synthetic: {len(realistic_synthetic)}")
         print(f"   Pure synthetic: {len(pure_synthetic)}")
+        
+        # Debug info to see which networks are in each category
+        if len(snap_real) > 0:
+            print(f"   SNAP networks: {snap_real}")
+        if len(realistic_synthetic) > 0:
+            print(f"   Realistic synthetic: {realistic_synthetic}")
         
         total_real = len(builtin_real) + len(snap_real)
         real_percentage = (total_real / len(networks)) * 100
@@ -88,7 +96,7 @@ if __name__ == "__main__":
     print("Testing network loading functionality")
     print("=" * 40)
     
-    networks = get_consistent_networks(max_network_size=5500, include_snap=True)
+    networks = get_consistent_networks(max_network_size=6000, include_snap=True)
     
     print(f"\nNetwork details:")
     for name, G in networks.items():

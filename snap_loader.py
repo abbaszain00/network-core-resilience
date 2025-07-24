@@ -23,17 +23,35 @@ class SNAPNetworkLoader:
                 'expected_nodes': 4039,
                 'type': 'social'
             },
-            'email_enron': {
-                'url': 'https://snap.stanford.edu/data/email-Enron.txt.gz', 
-                'description': 'Enron email network',
-                'expected_nodes': 36692,
-                'type': 'communication'
-            },
             'ca_grqc': {
                 'url': 'https://snap.stanford.edu/data/ca-GrQc.txt.gz',
                 'description': 'General Relativity collaboration',
                 'expected_nodes': 5242,
                 'type': 'collaboration'
+            },
+            'bitcoin_alpha': {
+                'url': 'https://snap.stanford.edu/data/soc-sign-bitcoinalpha.csv.gz',
+                'description': 'Bitcoin Alpha web of trust network',
+                'expected_nodes': 3783,
+                'type': 'trust'
+            },
+            'bitcoin_otc': {
+                'url': 'https://snap.stanford.edu/data/soc-sign-bitcoinotc.csv.gz',
+                'description': 'Bitcoin OTC web of trust network',
+                'expected_nodes': 5881,
+                'type': 'trust'
+            },
+            'wiki_vote': {
+                'url': 'https://snap.stanford.edu/data/wiki-Vote.txt.gz',
+                'description': 'Wikipedia who-votes-on-whom network',
+                'expected_nodes': 7115,
+                'type': 'voting'
+            },
+            'email_eu_core': {
+                'url': 'https://snap.stanford.edu/data/email-Eu-core.txt.gz',
+                'description': 'Email network from European research institution',
+                'expected_nodes': 1005,
+                'type': 'communication'
             }
         }
     
@@ -90,7 +108,7 @@ class SNAPNetworkLoader:
                     if line.startswith('#') or not line:
                         continue
                     
-                    parts = line.split()
+                    parts = line.split(',') if 'bitcoin' in network_name else line.split()
                     if len(parts) >= 2:
                         try:
                             node1, node2 = int(parts[0]), int(parts[1])
@@ -102,8 +120,14 @@ class SNAPNetworkLoader:
                 print(f"No valid edges in {network_name}")
                 return None
             
-            G = nx.Graph()
-            G.add_edges_from(edges)
+            # Handle signed networks (bitcoin networks have weights/signs)
+            if 'bitcoin' in network_name:
+                G = nx.Graph()  # Convert to undirected for simplicity
+                G.add_edges_from([(u, v) for u, v in edges])
+            else:
+                G = nx.Graph()
+                G.add_edges_from(edges)
+            
             G.remove_edges_from(nx.selfloop_edges(G))
             
             # Take largest connected component
@@ -127,6 +151,7 @@ class SNAPNetworkLoader:
         
         for network_name, info in self.network_urls.items():
             if info['expected_nodes'] > max_nodes:
+                print(f"Skipping {network_name}: {info['expected_nodes']} nodes > {max_nodes}")
                 continue
             
             G = self.load_snap_network(network_name)
@@ -135,6 +160,12 @@ class SNAPNetworkLoader:
         
         print(f"Loaded {len(networks)} SNAP networks")
         return networks
+    
+    def get_network_info(self):
+        """Print information about available networks."""
+        print("Available SNAP networks:")
+        for name, info in self.network_urls.items():
+            print(f"  {name}: {info['expected_nodes']} nodes - {info['description']} ({info['type']})")
 
 def get_snap_networks(max_nodes=10000):
     """Load SNAP networks with size limit."""
@@ -144,13 +175,15 @@ def get_snap_networks(max_nodes=10000):
 if __name__ == "__main__":
     print("Testing SNAP loader...")
     
-    networks = get_snap_networks(max_nodes=5500)
+    loader = SNAPNetworkLoader()
+    loader.get_network_info()
+    print()
+    
+    networks = get_snap_networks(max_nodes=6000)
     
     print(f"\nLoaded networks:")
     for name, G in networks.items():
         cores = nx.core_number(G)
         max_core = max(cores.values()) if cores else 0
         density = nx.density(G)
-        print(f"  {name}: {G.number_of_nodes()} nodes, max k-core: {max_core}, density: {density:.4f}")
-    
-    print(f"\nReady for evaluation")
+        print(f"  {name}: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, max k-core: {max_core}, density: {density:.4f}")

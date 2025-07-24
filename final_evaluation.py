@@ -46,7 +46,7 @@ class FinalEvaluationSuite:
             'clustering': nx.average_clustering(G)
         }
         
-    def run_comprehensive_evaluation(self, max_network_size=5000, runs_per_config=3):
+    def run_comprehensive_evaluation(self, max_network_size=6000, runs_per_config=3):
         """Execute full experimental evaluation."""
         
         self.start_time = time.time()
@@ -286,7 +286,7 @@ def main():
     evaluator = FinalEvaluationSuite()
     
     success = evaluator.run_comprehensive_evaluation(
-        max_network_size=5000,
+        max_network_size=6000,
         runs_per_config=3
     )
     
