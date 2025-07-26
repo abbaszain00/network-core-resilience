@@ -1,0 +1,9 @@
+attack_type,algorithm,mean,std
+betweenness,FastCM+,0.7053,0.1932
+betweenness,MRKC,0.7675,0.2017
+degree,FastCM+,0.6032,0.2408
+degree,MRKC,0.6532,0.2621
+kcore,FastCM+,0.6076,0.2416
+kcore,MRKC,0.6568,0.2622
+random,FastCM+,0.8649,0.1353
+random,MRKC,0.9133,0.1048

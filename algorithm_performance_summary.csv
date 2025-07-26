@@ -1,0 +1,3 @@
+algorithm,reinf_core_resilience_mean,reinf_core_resilience_std,followers_gained_mean,followers_gained_std,efficiency_mean,efficiency_std,core_improvement_mean,core_improvement_std
+FastCM+,0.6953,0.2329,85.1263,193.7693,-0.1627,0.2953,-0.4732,0.633
+MRKC,0.7477,0.2418,0.0,0.0,0.0115,0.0656,0.1007,0.4824
